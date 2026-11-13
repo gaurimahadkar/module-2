@@ -121,51 +121,129 @@ async function getBlogsFromAPI() {
     }
 }
 
+// Search and Category State
+let homeBlogs = [];
+let activeFilter = "All";
+let searchQuery = "";
+
 // Render Home Blogs
-async function renderHome(filter = "All") {
+function renderHome() {
     const target = document.getElementById("homeBlogGrid");
+    const searchMessage = document.getElementById("searchMessage");
+
+    if (!target) return;
+
+    const filteredBlogs = homeBlogs.filter(blog => {
+
+        const title = (blog.title || "").toLowerCase();
+        const content = (blog.content || "").toLowerCase();
+        const category = (blog.category || "General").toLowerCase();
+
+        const matchesCategory =
+            activeFilter === "All" ||
+            category === activeFilter.toLowerCase();
+
+        const matchesSearch =
+            title.includes(searchQuery) ||
+            content.includes(searchQuery);
+
+        return matchesCategory && matchesSearch;
+    });
+
+    target.innerHTML = filteredBlogs.length
+        ? filteredBlogs.map(blog => blogCard(blog)).join("")
+        : `<p class="empty-state">No stories found. Try another search!</p>`;
+
+    if (searchMessage) {
+        searchMessage.hidden = filteredBlogs.length > 0;
+    }
+}
+
+// Load Blogs
+async function loadHomeBlogs() {
+    const target = document.getElementById("homeBlogGrid");
+
     if (!target) return;
 
     target.innerHTML = "<p>Loading stories...</p>";
 
     const blogs = await getBlogsFromAPI();
-    const allBlogs = [...blogs, ...demoBlogs];
 
-    const filteredBlogs = allBlogs.filter(blog =>
-        filter === "All" || blog.category === filter
-    );
+    homeBlogs = [...blogs, ...demoBlogs];
 
-    target.innerHTML = filteredBlogs.length
-        ? filteredBlogs.map(blog => blogCard(blog)).join("")
-        : `<p class="empty-state">No stories in this category yet.</p>`;
+    renderHome();
 }
 
 // Page Initialization
 document.addEventListener("DOMContentLoaded", () => {
 
+    // Current Year
     const year = document.getElementById("year");
 
     if (year) {
         year.textContent = new Date().getFullYear();
     }
 
-    renderHome();
+    // Load Blogs
+    loadHomeBlogs();
 
+    // Category Filter
     document.querySelectorAll("[data-filter]").forEach(button => {
+
         button.addEventListener("click", () => {
+
             document.querySelectorAll("[data-filter]").forEach(btn =>
                 btn.classList.remove("selected")
             );
 
             button.classList.add("selected");
-            renderHome(button.dataset.filter);
+
+            activeFilter = button.dataset.filter || "All";
+
+            renderHome();
         });
     });
 
+    // Search Functionality
+    const searchInput = document.getElementById("blogSearch");
+    const clearButton = document.getElementById("clearSearch");
+
+    if (searchInput) {
+
+        searchInput.addEventListener("input", () => {
+
+            searchQuery = searchInput.value.trim().toLowerCase();
+
+            if (clearButton) {
+                clearButton.hidden = searchQuery.length === 0;
+            }
+
+            renderHome();
+        });
+    }
+
+    // Clear Search
+    if (clearButton && searchInput) {
+
+        clearButton.addEventListener("click", () => {
+
+            searchInput.value = "";
+            searchQuery = "";
+
+            clearButton.hidden = true;
+
+            renderHome();
+
+            searchInput.focus();
+        });
+    }
+
+    // Mobile Navigation
     const toggle = document.querySelector(".menu-toggle");
 
     if (toggle) {
         toggle.addEventListener("click", () => {
+
             const links = document.querySelector(".nav-links");
 
             links?.classList.toggle("open");
